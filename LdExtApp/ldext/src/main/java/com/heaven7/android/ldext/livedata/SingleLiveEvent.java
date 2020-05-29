@@ -1,87 +1,59 @@
+/*
+ *  Copyright 2017 Google Inc.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
 package com.heaven7.android.ldext.livedata;
 
 import androidx.annotation.MainThread;
-import androidx.annotation.Nullable;
 import androidx.lifecycle.LifecycleOwner;
-import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.Observer;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
- * the live-data which can used as global and sticky .
- * @param <T> the data type
- * @author heaven7
+ * A lifecycle-aware observable that sends only new updates after subscription, used for events like
+ * navigate and Snackbar messages.
+ * <p>
+ * This avoids a common problem with events: on configuration change (like rotation) an update
+ * can be emitted if the observer is active. This LiveData only calls the observable if there's an
+ * explicit call to setValue() or call().
+ * <p>
+ * Note that only one observer is going to be notified of changes.
  */
-public class SingleLiveEvent<T> extends MutableLiveData<T> {
-
-    private static final Object UNSET = new Object();
-    private final AtomicBoolean mPending = new AtomicBoolean(false);
-    private final boolean mSticky;
-    private Object mValue = UNSET;
+public class SingleLiveEvent<T> extends AbsoluteLiveData<T> {
 
     public SingleLiveEvent(T value, boolean mSticky) {
-        super(value);
-        this.mValue = value;
-        this.mSticky = mSticky;
+        super(value, mSticky);
     }
     public SingleLiveEvent(T value) {
-        this(value, false);
+        super(value);
     }
-
     public SingleLiveEvent(boolean mSticky) {
-        this.mSticky = mSticky;
+        super(mSticky);
     }
-
     public SingleLiveEvent() {
-        this(false);
+        super();
     }
 
     @MainThread
     @Override
     public void observe(LifecycleOwner owner, final Observer<? super T> observer) {
         removeObservers(owner);
-        if(mSticky && mValue != UNSET){
-            observer.onChanged((T)mValue);
-            mPending.set(false);
-        }
-        WrappedObserver wrappedObserver = new WrappedObserver(observer);
-        // Observe the internal MutableLiveData
-        super.observe(owner, wrappedObserver);
+        super.observe(owner, observer);
     }
-
-    @MainThread
     @Override
-    public void setValue(@Nullable T t) {
-        if(mSticky){
-            mValue = t;
-        }
-        mPending.set(true);
-        super.setValue(t);
+    protected boolean isSingle() {
+        return true;
     }
 
-    @Override
-    public void postValue(T value) {
-        if(mSticky){
-            mValue = value;
-        }
-        mPending.set(true);
-        super.postValue(value);
-    }
-
-    private class WrappedObserver implements Observer<T>{
-
-        private final Observer<? super T> base;
-
-        public WrappedObserver(Observer<? super T> base) {
-            this.base = base;
-        }
-
-        @Override
-        public void onChanged(T t) {
-            if (mPending.compareAndSet(true, false)) {
-                base.onChanged(t);
-            }
-        }
-    }
 }

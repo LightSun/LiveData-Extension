@@ -1,21 +1,24 @@
 package com.heaven7.android.ldext.manager;
 
+import android.content.Intent;
+
 import androidx.lifecycle.LifecycleOwner;
 
-import com.heaven7.android.ldext.livedata.SingleLiveEvent;
+import com.heaven7.android.ldext.livedata.AbsoluteLiveData;
+import com.heaven7.android.ldext.model.CrossDomainKey;
 import com.heaven7.android.ldext.observer.FocusDestroyOwner;
 import com.heaven7.java.base.util.SparseArrayDelegate;
 import com.heaven7.java.base.util.SparseFactory;
 
 /**
- * the cross domain live data manager. which is create and destroy on origin LifecycleOwner. But can observer on other LifecycleOwner.
+ * the cross domain live data manager. which is create and destroy on origin LifecycleOwner. But observer on other LifecycleOwner.
  * @author heaven7
  */
 public final class CrossDomainLiveDataManager{
 
     private static final String TAG = "CrossDomainLiveDataM";
-    private SparseArrayDelegate<SingleLiveEvent<?>> mMap;
-    private SparseArrayDelegate<SparseArrayDelegate<SingleLiveEvent<?>>> mMultiMap;
+    private SparseArrayDelegate<AbsoluteLiveData<?>> mMap;
+    private SparseArrayDelegate<SparseArrayDelegate<AbsoluteLiveData<?>>> mMultiMap;
 
     /**
      * create cross-domain live data manager.
@@ -28,9 +31,9 @@ public final class CrossDomainLiveDataManager{
      * @param origin the origin LifecycleOwner
      */
     public void start(LifecycleOwner origin){
-        SingleLiveEvent<?> liveEvent = mMap.get(origin.hashCode());
+        AbsoluteLiveData<?> liveEvent = mMap.get(origin.hashCode());
         if(liveEvent == null){
-            mMap.put(origin.hashCode(), new SingleLiveEvent<Object>(true));
+            mMap.put(origin.hashCode(), new AbsoluteLiveData<Object>(true));
         }
         origin.getLifecycle().addObserver(new FocusDestroyOwner() {
             @Override
@@ -49,7 +52,7 @@ public final class CrossDomainLiveDataManager{
         if(mMultiMap == null){
             mMultiMap = SparseFactory.newSparseArray(3);
         }
-        SparseArrayDelegate<SingleLiveEvent<?>> delegate = mMultiMap.get(origin.hashCode());
+        SparseArrayDelegate<AbsoluteLiveData<?>> delegate = mMultiMap.get(origin.hashCode());
         if(delegate == null){
             delegate = SparseFactory.newSparseArray(3);
             mMultiMap.put(origin.hashCode(), delegate);
@@ -62,23 +65,23 @@ public final class CrossDomainLiveDataManager{
         });
         return new Multi(this, origin.hashCode());
     }
-    public <T> SingleLiveEvent<T> getLiveData(LifecycleOwner origin, int key){
+    public <T> AbsoluteLiveData<T> getLiveData(LifecycleOwner origin, int key){
         return getLiveData(origin.hashCode(), key);
     }
     @SuppressWarnings("unchecked")
-    private <T> SingleLiveEvent<T> getLiveData(int originHash, int key){
+    private <T> AbsoluteLiveData<T> getLiveData(int originHash, int key){
         if(mMultiMap == null){
             throw new IllegalStateException("you must call #startMulti(...) first!>");
         }
-        SparseArrayDelegate<SingleLiveEvent<?>> delegate = mMultiMap.get(originHash);
+        SparseArrayDelegate<AbsoluteLiveData<?>> delegate = mMultiMap.get(originHash);
         if(delegate == null){
             throw new IllegalStateException("you must call #startMulti(...) first!>");
         }
-        SingleLiveEvent<?> event = delegate.get(key);
+        AbsoluteLiveData<?> event = delegate.get(key);
         if(event == null){
             throw new IllegalStateException("can't find live-data for origin_hash =  " + originHash + " And key = " + key);
         }
-        return (SingleLiveEvent<T>) event;
+        return (AbsoluteLiveData<T>) event;
     }
     /**
      * get the live data by original lifecycle owner
@@ -87,8 +90,8 @@ public final class CrossDomainLiveDataManager{
      * @return the Live data
      */
     @SuppressWarnings("unchecked")
-    public <T> SingleLiveEvent<T> getLiveData(LifecycleOwner origin){
-        SingleLiveEvent<T> event = (SingleLiveEvent<T>) mMap.get(origin.hashCode());
+    public <T> AbsoluteLiveData<T> getLiveData(LifecycleOwner origin){
+        AbsoluteLiveData<T> event = (AbsoluteLiveData<T>) mMap.get(origin.hashCode());
         if(event == null){
             throw new IllegalStateException("can't find live-data for origin owner: " + origin);
         }
@@ -103,8 +106,8 @@ public final class CrossDomainLiveDataManager{
      * @return the live data
      */
     @SuppressWarnings("unchecked")
-    public <T> SingleLiveEvent<T> getLiveData(final int originHash, LifecycleOwner another){
-        final SingleLiveEvent<T> event = (SingleLiveEvent<T>) mMap.get(originHash);
+    public <T> AbsoluteLiveData<T> getLiveData(final int originHash,LifecycleOwner another){
+        final AbsoluteLiveData<T> event = (AbsoluteLiveData<T>) mMap.get(originHash);
         if(event == null){
             throw new IllegalStateException("can't find live-data for originHash =  " + originHash);
         }
@@ -118,14 +121,45 @@ public final class CrossDomainLiveDataManager{
     }
     /**
      * get the live data from another LifecycleOwner
+     * @param key the CrossDomainKey
+     * @param another the another LifecycleOwner
+     * @param <T> the data type
+     * @return the live data
+     */
+    public <T> AbsoluteLiveData<T> getLiveData(CrossDomainKey key, LifecycleOwner another){
+        if(key.getKey() == null){
+            return getLiveData(key.getOriginHash(), another);
+        }else {
+            return getLiveData(key.getOriginHash(), key.getKey(), another);
+        }
+    }
+    /**
+     * get the live data from another LifecycleOwner
+     * @param intent the intent
+     * @param keyFromIntent the key from intent
+     * @param another the another LifecycleOwner
+     * @param <T> the data type
+     * @return the live data
+     */
+    public <T> AbsoluteLiveData<T> getLiveDataFromIntent(Intent intent, String keyFromIntent, LifecycleOwner another){
+        CrossDomainKey key = intent.getParcelableExtra(keyFromIntent);
+        if(key != null){
+            return getLiveData(key, another);
+        }else {
+            int hash = intent.getIntExtra(keyFromIntent, 0);
+            return getLiveData(hash, another);
+        }
+    }
+    /**
+     * get the live data from another LifecycleOwner
      * @param originHash the hash from origin LifecycleOwner
      * @param key the key to get live-data
      * @param another the another LifecycleOwner
      * @param <T> the data type
      * @return the live data
      */
-    public <T> SingleLiveEvent<T> getLiveData(final int originHash, int key, LifecycleOwner another){
-        final SingleLiveEvent<T> liveData = getLiveData(originHash, key);
+    public <T> AbsoluteLiveData<T> getLiveData(final int originHash, int key, LifecycleOwner another){
+        final AbsoluteLiveData<T> liveData = getLiveData(originHash, key);
         another.getLifecycle().addObserver(new FocusDestroyOwner(){
             @Override
             protected void onDestroy(LifecycleOwner source) {
@@ -144,11 +178,11 @@ public final class CrossDomainLiveDataManager{
             this.hash = hash;
         }
         public void register(int...keys){
-            SparseArrayDelegate<SingleLiveEvent<?>> delegate = manager.mMultiMap.get(hash);
+            SparseArrayDelegate<AbsoluteLiveData<?>> delegate = manager.mMultiMap.get(hash);
             for (int key : keys){
-                SingleLiveEvent<?> event = delegate.get(key);
+                AbsoluteLiveData<?> event = delegate.get(key);
                 if(event == null){
-                    delegate.put(key, new SingleLiveEvent<>(true));
+                    delegate.put(key, new AbsoluteLiveData<>(true));
                 }
             }
         }
