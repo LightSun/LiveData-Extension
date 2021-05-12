@@ -32,7 +32,7 @@ dependencies {
     implementation 'com.heaven7.java.base:Java-base:1.2.0'
     implementation "androidx.lifecycle:lifecycle-extensions:2.2.0"
 }
-
+/*
 tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
 }
@@ -60,3 +60,4 @@ artifacts {
     archives sourcesJar
     archives javadocJar
 }
+*/
