@@ -2,6 +2,8 @@ package com.heaven7.android.ldext.manager;
 
 import androidx.lifecycle.LifecycleOwner;
 
+import com.heaven7.android.ldext.livedata.AbsoluteLiveData;
+import com.heaven7.android.ldext.observer.FocusDestroyOwner;
 import com.heaven7.java.base.util.ArrayUtils;
 import com.heaven7.java.base.util.SparseArrayDelegate;
 import com.heaven7.java.base.util.SparseFactory;
@@ -24,7 +26,7 @@ public final class ComposeLiveDataManager {
         return key;
     }
     @SuppressWarnings("unchecked")
-    public <T>AbsoluteLiveData<T> getLiveData(final int key, LifecycleOwner owner){
+    public <T> AbsoluteLiveData<T> getLiveData(final int key, LifecycleOwner owner){
         final Impl impl = mMap.get(key);
         if(impl == null){
             throw new IllegalStateException("can't find live-data or may be live-data is destroyed");
